@@ -74,3 +74,5 @@ cython_debug/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+hyperliquid_samples/
