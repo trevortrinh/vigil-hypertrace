@@ -75,4 +75,4 @@ cython_debug/
 ehthumbs.db
 Thumbs.db
 
-hyperliquid_samples/
+data/
