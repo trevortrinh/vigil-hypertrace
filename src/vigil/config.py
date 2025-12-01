@@ -16,63 +16,26 @@ HL_PREFIX = "node_fills_by_block/hourly"
 REQUEST_PAYER = {"RequestPayer": "requester"}
 
 # AWS
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+AWS_REGION = os.getenv("AWS_REGION")
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 
-# Local paths - always relative to project root
-DATA_DIR = Path(os.getenv("DATA_DIR", PROJECT_ROOT / "data"))
-LOCAL_PARQUET_DIR = DATA_DIR / HL_BUCKET / HL_PREFIX
+# Local data directory (always a Path, for notebooks)
+LOCAL_DATA_DIR = PROJECT_ROOT / "data"
+
+# Optional S3 override for scripts
+# Set PARQUET_S3=s3://bucket/prefix to use S3 instead of local
+PARQUET_S3 = os.getenv("PARQUET_S3")
+
+
+def get_parquet_dir() -> str:
+    """Get the parquet directory path (local or S3)."""
+    if PARQUET_S3:
+        return PARQUET_S3.rstrip("/")
+    return str(LOCAL_DATA_DIR / HL_BUCKET / HL_PREFIX)
+
+
+PARQUET_DIR = get_parquet_dir()
 
 # Database
 DATABASE_URL = os.getenv("DATABASE_URL")
-
-# Fill columns (raw names from Hyperliquid S3)
-FILL_COLUMNS = [
-    "time",
-    "user",
-    "coin",
-    "px",
-    "sz",
-    "side",
-    "dir",
-    "startPosition",
-    "closedPnl",
-    "fee",
-    "crossed",
-    "hash",
-    "oid",
-    "tid",
-    "block_time",
-    "feeToken",
-    "twapId",
-    "builderFee",
-    "cloid",
-    "builder",
-    "liquidation",
-]
-
-# SQL-safe column names (quoted where needed for reserved words/camelCase)
-SQL_COLUMNS = [
-    "time",
-    '"user"',
-    "coin",
-    "px",
-    "sz",
-    "side",
-    "dir",
-    '"startPosition"',
-    '"closedPnl"',
-    "fee",
-    "crossed",
-    "hash",
-    "oid",
-    "tid",
-    "block_time",
-    '"feeToken"',
-    '"twapId"',
-    '"builderFee"',
-    "cloid",
-    "builder",
-    "liquidation",
-]

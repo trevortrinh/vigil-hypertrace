@@ -1,49 +1,54 @@
 """Vigil: Hyperliquid Trader Intelligence Engine."""
 
-from vigil.config import DATA_DIR, DATABASE_URL, HL_BUCKET, HL_PREFIX, LOCAL_PARQUET_DIR
-from vigil.db import execute_query, get_db_connection, load_parquet_to_db
+from vigil.config import DATABASE_URL, HL_BUCKET, HL_PREFIX, LOCAL_DATA_DIR, PARQUET_DIR
+from vigil.db import execute_query, get_db_connection, load_dataframe_to_db, load_parquet_to_db
 from vigil.s3 import (
     download,
-    download_hour,
     get_s3_client,
-    list_available_hours,
     list_files,
     list_prefixes,
 )
 from vigil.transforms import (
     decompress_lz4,
+    is_s3_path,
+    list_parquet_files,
     load_parquet,
     load_parquet_dir,
+    parquet_exists,
     parse_fills,
     parse_jsonl_lz4,
     parse_msgpack_lz4,
+    parse_s3_path,
     save_parquet,
 )
 
 __all__ = [
     # Config
-    "DATA_DIR",
+    "LOCAL_DATA_DIR",
     "DATABASE_URL",
     "HL_BUCKET",
     "HL_PREFIX",
-    "LOCAL_PARQUET_DIR",
+    "PARQUET_DIR",
     # S3
     "get_s3_client",
     "download",
-    "download_hour",
-    "list_available_hours",
     "list_files",
     "list_prefixes",
-    # Transforms
+    # Transforms (with S3/local path support)
     "decompress_lz4",
+    "is_s3_path",
+    "list_parquet_files",
     "load_parquet",
     "load_parquet_dir",
+    "parquet_exists",
     "parse_fills",
     "parse_jsonl_lz4",
     "parse_msgpack_lz4",
+    "parse_s3_path",
     "save_parquet",
     # DB
     "execute_query",
     "get_db_connection",
+    "load_dataframe_to_db",
     "load_parquet_to_db",
 ]

@@ -9,24 +9,24 @@
 CREATE OR REPLACE VIEW trader_daily AS
 SELECT
     (time / 86400000) * 86400000 AS day,  -- Floor to day in ms
-    "user",
+    user_address,
     COUNT(*) AS fill_count,
     SUM(px::numeric * sz::numeric) AS volume,
-    SUM(COALESCE("closedPnl"::numeric, 0)) AS realized_pnl,
+    SUM(COALESCE(closed_pnl::numeric, 0)) AS realized_pnl,
     SUM(COALESCE(fee::numeric, 0)) AS fees_paid,
     AVG(CASE WHEN NOT crossed THEN 1 ELSE 0 END) AS maker_pct,
-    SUM(CASE WHEN "closedPnl"::numeric > 0 THEN 1 ELSE 0 END) AS winning_trades,
-    SUM(CASE WHEN "closedPnl"::numeric < 0 THEN 1 ELSE 0 END) AS losing_trades,
+    SUM(CASE WHEN closed_pnl::numeric > 0 THEN 1 ELSE 0 END) AS winning_trades,
+    SUM(CASE WHEN closed_pnl::numeric < 0 THEN 1 ELSE 0 END) AS losing_trades,
     COUNT(DISTINCT coin) AS unique_coins
 FROM fills
-GROUP BY day, "user";
+GROUP BY day, user_address;
 
 -- =============================================================================
 -- TRADER PROFILES (computed by analysis pipeline)
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS trader_profiles (
-    "user"              TEXT PRIMARY KEY,
+    user_address        TEXT PRIMARY KEY,
 
     -- Activity
     first_trade         TIMESTAMPTZ,

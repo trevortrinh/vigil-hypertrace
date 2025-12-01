@@ -6,7 +6,36 @@ from pathlib import Path
 import polars as pl
 import psycopg
 
-from vigil.config import DATABASE_URL, FILL_COLUMNS, SQL_COLUMNS
+from vigil.config import DATABASE_URL
+
+# Parquet column (from S3) -> DB column (snake_case)
+PARQUET_TO_DB = {
+    "time": "time",
+    "user": "user_address",
+    "coin": "coin",
+    "px": "px",
+    "sz": "sz",
+    "side": "side",
+    "dir": "dir",
+    "startPosition": "start_position",
+    "closedPnl": "closed_pnl",
+    "fee": "fee",
+    "crossed": "crossed",
+    "hash": "hash",
+    "oid": "oid",
+    "tid": "tid",
+    "block_time": "block_time",
+    "feeToken": "fee_token",
+    "twapId": "twap_id",
+    "builderFee": "builder_fee",
+    "cloid": "cloid",
+    "builder": "builder",
+    "liquidation": "liquidation",
+}
+
+# Ordered lists for COPY operations
+PARQUET_COLUMNS = list(PARQUET_TO_DB.keys())
+DB_COLUMNS = list(PARQUET_TO_DB.values())
 
 
 def get_db_connection(autocommit: bool = False):
@@ -40,6 +69,8 @@ def load_parquet_to_db(parquet_path: Path | str, conn) -> int:
 def load_dataframe_to_db(df: pl.DataFrame, conn) -> int:
     """Load a Polars DataFrame into the fills table.
 
+    Renames parquet columns (camelCase) to DB columns (snake_case).
+
     Args:
         df: Polars DataFrame with fill data.
         conn: Database connection.
@@ -50,15 +81,17 @@ def load_dataframe_to_db(df: pl.DataFrame, conn) -> int:
     if df.is_empty():
         return 0
 
-    # Ensure all columns exist
-    for col in FILL_COLUMNS:
+    # Ensure all parquet columns exist (add nulls for missing)
+    for col in PARQUET_COLUMNS:
         if col not in df.columns:
             df = df.with_columns(pl.lit(None).alias(col))
-    df = df.select(FILL_COLUMNS)
+
+    # Select and rename to DB columns
+    df = df.select(PARQUET_COLUMNS).rename(PARQUET_TO_DB)
 
     # Build CSV for COPY
     csv_buffer = io.StringIO()
-    csv_buffer.write("\t".join(FILL_COLUMNS) + "\n")
+    csv_buffer.write("\t".join(DB_COLUMNS) + "\n")
 
     for row in df.iter_rows():
         values = []
@@ -77,7 +110,7 @@ def load_dataframe_to_db(df: pl.DataFrame, conn) -> int:
 
     with conn.cursor() as cur:
         with cur.copy(
-            f"COPY fills ({','.join(SQL_COLUMNS)}) FROM STDIN WITH (FORMAT text, HEADER true)"
+            f"COPY fills ({','.join(DB_COLUMNS)}) FROM STDIN WITH (FORMAT text, HEADER true)"
         ) as copy:
             while data := csv_buffer.read(8192):
                 copy.write(data)

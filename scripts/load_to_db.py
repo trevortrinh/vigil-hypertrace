@@ -2,23 +2,28 @@
 """
 Load Parquet fill data into TimescaleDB.
 
-Usage:
-    python scripts/load_to_db.py
-"""
+Supports loading from local filesystem or S3 based on DATA_DIR env var.
 
-from pathlib import Path
+Usage:
+    # Local (default)
+    python scripts/load_to_db.py
+
+    # From S3
+    DATA_DIR=s3://my-bucket/vigil-data python scripts/load_to_db.py
+"""
 
 from tqdm import tqdm
 
-from vigil.config import LOCAL_PARQUET_DIR
-from vigil.db import get_db_connection, load_parquet_to_db
+from vigil.config import PARQUET_DIR
+from vigil.db import get_db_connection, load_dataframe_to_db
+from vigil.transforms import is_s3_path, list_parquet_files, load_parquet
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
-# Source directory (default: local parquet dir)
-SOURCE_DIR = LOCAL_PARQUET_DIR
+# Source directory (default: from config, supports local or S3)
+SOURCE_DIR = PARQUET_DIR
 
 # Filter by date (None = load all)
 DATE_FILTER = None  # e.g., "20251101"
@@ -29,31 +34,17 @@ TRUNCATE = False
 # =============================================================================
 
 
-def get_parquet_files(source_dir: Path, date_filter: str = None) -> list[Path]:
-    """Find parquet files, optionally filtered by date folder."""
-    files = []
-    for parquet_file in sorted(source_dir.rglob("*.parquet")):
-        if date_filter:
-            if parquet_file.parent.name != date_filter:
-                continue
-        files.append(parquet_file)
-    return files
-
-
 def main():
-    source_dir = Path(SOURCE_DIR) if isinstance(SOURCE_DIR, str) else SOURCE_DIR
+    source_dir = SOURCE_DIR
+    is_s3 = is_s3_path(source_dir)
 
-    if not source_dir.exists():
-        print(f"Error: {source_dir} not found")
-        return
-
-    parquet_files = get_parquet_files(source_dir, DATE_FILTER)
+    parquet_files = list_parquet_files(source_dir, DATE_FILTER)
     if not parquet_files:
         print(f"No parquet files in {source_dir}")
         return
 
     print(f"Found {len(parquet_files)} file(s)")
-    print(f"Source: {source_dir}")
+    print(f"Source: {source_dir} ({'S3' if is_s3 else 'local'})")
 
     with get_db_connection() as conn:
         if TRUNCATE:
@@ -68,7 +59,8 @@ def main():
         total = 0
         for pf in tqdm(parquet_files, desc="Loading"):
             try:
-                count = load_parquet_to_db(pf, conn)
+                df = load_parquet(pf)
+                count = load_dataframe_to_db(df, conn)
                 conn.commit()
                 total += count
             except Exception as e:
