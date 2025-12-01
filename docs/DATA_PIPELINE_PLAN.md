@@ -15,7 +15,7 @@ Build a trader intelligence system that:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                            us-east-2                                    │
+│                            us-east-1                                    │
 │                                                                         │
 │  ┌─────────────┐      ┌─────────────┐      ┌─────────────┐            │
 │  │ Hyperliquid │─────▶│  Your S3    │─────▶│ TimescaleDB │            │
@@ -60,14 +60,14 @@ Build a trader intelligence system that:
 | **SQL power** | Window functions, CTEs, complex joins |
 | **Time-series optimized** | Hypertables, chunking, compression |
 
-### 3. Same Region (us-east-2) = Free Transfer
+### 3. Same Region (us-east-1) = Free Transfer
 
-Hyperliquid S3 is in `us-east-2`. Running EC2 in same region:
+Hyperliquid S3 is in `us-east-1`. Running EC2 in same region:
 
 | Transfer Type | Cost for 75GB |
 |--------------|---------------|
 | Cross-region (to your laptop) | **$6.75** |
-| Same-region (EC2 in us-east-2) | **$0.00** |
+| Same-region (EC2 in us-east-1) | **$0.00** |
 
 ---
 
@@ -113,7 +113,7 @@ python scripts/compute_features.py --date 2025-11-01
 └─────────────────┘     └─────────────────┘     └─────────────────┘
      ~4.5M fills            ~135M fills            ~550M fills
      ~33K traders           ~100K traders          ~100K+ traders
-     Docker locally         EC2 us-east-2          EC2 us-east-2
+     Docker locally         EC2 us-east-1          EC2 us-east-1
      ~15 min                ~3-4 hrs               ~10-12 hrs
 ```
 
@@ -179,7 +179,7 @@ jupyter notebook
 ### Setup
 
 ```
-EC2 (us-east-2)
+EC2 (us-east-1)
 ├── TimescaleDB (Docker or installed)
 ├── S3 bucket (Parquet files)
 └── Open port 5432 to your IP
@@ -207,7 +207,7 @@ Your Laptop
 |-----------|------|------|
 | Instance | r6g.large (2 vCPU, 16GB RAM) | ~$0.10/hr |
 | Storage | 200GB gp3 EBS | ~$16/mo |
-| Region | us-east-2 (same as Hyperliquid) | Free transfer |
+| Region | us-east-1 (same as Hyperliquid) | Free transfer |
 
 ### Commands
 
@@ -255,7 +255,7 @@ psql postgresql://user:pass@your-ec2-ip:5432/vigil
 |-----------|------|------|
 | Instance | r6g.xlarge (4 vCPU, 32GB RAM) | ~$0.20/hr |
 | Storage | 500GB gp3 EBS | ~$40/mo |
-| Region | us-east-2 | Free transfer |
+| Region | us-east-1 | Free transfer |
 
 ---
 
@@ -615,7 +615,7 @@ dependencies = [
 # AWS credentials
 AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
-AWS_REGION=us-east-2
+AWS_REGION=us-east-1
 
 # Your S3 bucket
 VIGIL_S3_BUCKET=your-vigil-bucket
@@ -701,7 +701,7 @@ volumes:
 
 ## Next Steps
 
-1. **Create S3 bucket** in us-east-2
+1. **Create S3 bucket** in us-east-1
 2. **Set up local Docker** with TimescaleDB
 3. **Build fetch_data.py** script
 4. **Build load_to_db.py** script

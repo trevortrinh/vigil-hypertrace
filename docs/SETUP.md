@@ -89,7 +89,7 @@ aws rds create-db-instance \
   --vpc-security-group-ids sg-xxx
 
 # After creation, enable TimescaleDB extension
-psql -h vigil-timescale.xxx.us-east-2.rds.amazonaws.com -U postgres -d vigil
+psql -h vigil-timescale.xxx.us-east-1.rds.amazonaws.com -U postgres -d vigil
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 \i sql/001_fills.sql
 \i sql/002_transformations.sql
@@ -141,7 +141,7 @@ python scripts/load_to_db.py --source s3://your-bucket/vigil/parquet/
 ```
 AWS_ACCESS_KEY_ID=xxx
 AWS_SECRET_ACCESS_KEY=xxx
-AWS_REGION=us-east-2
+AWS_REGION=us-east-1
 DATABASE_URL=postgresql://postgres:password@localhost:5435/vigil
 DATA_DIR=./data
 ```
@@ -150,7 +150,7 @@ DATA_DIR=./data
 ```
 DATABASE_URL=postgresql://postgres:xxx@vigil-timescale.xxx.rds.amazonaws.com:5432/vigil
 OUTPUT_BUCKET=s3://your-bucket/vigil/parquet
-AWS_REGION=us-east-2
+AWS_REGION=us-east-1
 ```
 
 ## Summary

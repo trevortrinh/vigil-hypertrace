@@ -6,7 +6,7 @@
 aws s3 cp s3://BUCKET/PATH /local/path --request-payer requester --profile trevor
 ```
 
-- **Region**: us-east-2
+- **Region**: us-east-1
 - **Profile**: trevor
 - **Requester pays**: Yes (you pay transfer costs)
 

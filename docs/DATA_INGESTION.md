@@ -17,7 +17,7 @@ s3://hl-mainnet-node-data/node_fills_by_block/hourly/
 
 - **Total:** ~126 days, ~75 GB compressed
 - **Format:** LZ4-compressed JSON lines
-- **Region:** us-east-2
+- **Region:** us-east-1
 
 ---
 
@@ -51,8 +51,8 @@ Parquet approach:
 
 ```
 ┌──────────────────┐          ┌──────────────────┐          ┌──────────────────┐
-│  HL S3           │─ stream ─│  EC2 us-east-2   │─ stream ─│  Your S3         │
-│  (us-east-2)     │  (free)  │  (decompress +   │  (free)  │  (us-east-2)     │
+│  HL S3           │─ stream ─│  EC2 us-east-1   │─ stream ─│  Your S3         │
+│  (us-east-1)     │  (free)  │  (decompress +   │  (free)  │  (us-east-1)     │
 │                  │          │  transform)      │          │                  │
 └──────────────────┘          └──────────────────┘          └──────────────────┘
                                      │
@@ -100,7 +100,7 @@ from io import BytesIO
 import json
 from datetime import datetime, timedelta
 
-s3 = boto3.client('s3', region_name='us-east-2')
+s3 = boto3.client('s3', region_name='us-east-1')
 SOURCE_BUCKET = 'hl-mainnet-node-data'
 DEST_BUCKET = 'your-vigil-bucket'  # Update this
 REQUEST_PAYER = {'RequestPayer': 'requester'}
@@ -212,7 +212,7 @@ conn = duckdb.connect('vigil.db')
 conn.execute("""
     INSTALL httpfs;
     LOAD httpfs;
-    SET s3_region='us-east-2';
+    SET s3_region='us-east-1';
     SET s3_access_key_id='...';
     SET s3_secret_access_key='...';
 """)
@@ -260,13 +260,13 @@ SELECT * FROM s3(
 | Approach | Transfer Cost | Compute Cost | Time |
 |----------|---------------|--------------|------|
 | Local Mac | ~$7 egress | $0 | 8-12 hrs |
-| **EC2 us-east-2** | **$0** | **~$1.50** | **1-2 hrs** |
+| **EC2 us-east-1** | **$0** | **~$1.50** | **1-2 hrs** |
 | AWS DataSync | $0.94 | $0 | 2-3 hrs |
 
 ### Recommended EC2 Setup
 
 - **Instance:** c5.4xlarge ($0.68/hr) - 16 vCPU, 32 GB RAM
-- **Region:** us-east-2 (same as source bucket)
+- **Region:** us-east-1 (same as source bucket)
 - **Runtime:** ~2 hours for full history
 - **Total cost:** ~$1.50
 
@@ -274,8 +274,8 @@ SELECT * FROM s3(
 
 ## Execution Plan
 
-1. **Create S3 bucket** in us-east-2
-2. **Launch EC2** (c5.4xlarge) in us-east-2
+1. **Create S3 bucket** in us-east-1
+2. **Launch EC2** (c5.4xlarge) in us-east-1
 3. **Install dependencies:** `pip install boto3 lz4 polars`
 4. **Run ingest script** for full date range
 5. **Verify data** in S3
