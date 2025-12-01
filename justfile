@@ -9,19 +9,46 @@ fetch-data:
 load-data:
     uv run python scripts/load_to_db.py
 
-# db
-db-up:
-    docker compose up -d
+# db (tigerdb cloud - default)
+db-query sql:
+    #!/usr/bin/env bash
+    source .env && psql "$DATABASE_URL" -c "{{sql}}"
 
-db-down:
-    docker compose down
+db-migrate:
+    #!/usr/bin/env bash
+    source .env
+    for f in sql/*.sql; do
+        echo "Running $f..."
+        psql "$DATABASE_URL" -f "$f"
+    done
 
 db-reset:
-    just db-query "DROP TABLE IF EXISTS fills CASCADE"
-    docker exec vigil-timescaledb psql -U postgres -d vigil -f /docker-entrypoint-initdb.d/001_fills.sql
-    docker exec vigil-timescaledb psql -U postgres -d vigil -f /docker-entrypoint-initdb.d/002_transformations.sql
+    just db-query "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+    just db-migrate
 
-db-query sql:
+db-shell:
+    #!/usr/bin/env bash
+    source .env && psql "$DATABASE_URL"
+
+# db-local (docker)
+db-local-up:
+    docker compose up -d
+
+db-local-down:
+    docker compose down
+
+db-local-reset:
+    just db-local-query "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+    just db-local-migrate
+
+db-local-migrate:
+    #!/usr/bin/env bash
+    for f in sql/*.sql; do
+        echo "Running $f..."
+        docker exec vigil-timescaledb psql -U postgres -d vigil -f /docker-entrypoint-initdb.d/$(basename "$f")
+    done
+
+db-local-query sql:
     docker exec vigil-timescaledb psql -U postgres -d vigil -c "{{sql}}"
 
 # utils

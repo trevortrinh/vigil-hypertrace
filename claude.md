@@ -38,16 +38,23 @@ data/                # Local data storage (gitignored)
 ```bash
 # Setup
 uv sync                    # Install dependencies
-just db-up                 # Start local TimescaleDB (Docker)
-just db-down               # Stop database
-just db-reset              # Reinitialize schema
 
 # Data pipeline
 just fetch-data            # Download from Hyperliquid S3
 just load-data             # Load parquet → database
 
-# Database
+# Database (TigerDB cloud - default)
 just db-query "SQL"        # Run SQL query
+just db-migrate            # Run all sql/*.sql migrations
+just db-reset              # Drop schema + re-migrate
+just db-shell              # Interactive psql
+
+# Database (local Docker)
+just db-local-up           # Start local TimescaleDB
+just db-local-down         # Stop local database
+just db-local-query "SQL"  # Run SQL query locally
+just db-local-migrate      # Run migrations locally
+just db-local-reset        # Reset local database
 
 # Utilities
 just clean                 # Clear local data
