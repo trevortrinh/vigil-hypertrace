@@ -89,31 +89,32 @@ def load_dataframe_to_db(df: pl.DataFrame, conn) -> int:
     # Select and rename to DB columns
     df = df.select(PARQUET_COLUMNS).rename(PARQUET_TO_DB)
 
-    # Build CSV for COPY
-    csv_buffer = io.StringIO()
-    csv_buffer.write("\t".join(DB_COLUMNS) + "\n")
+    # Convert liquidation struct to JSON string (only nested column)
+    if "liquidation" in df.columns and df["liquidation"].dtype != pl.String:
+        df = df.with_columns(pl.col("liquidation").struct.json_encode().alias("liquidation"))
 
-    for row in df.iter_rows():
-        values = []
-        for val in row:
-            if val is None:
-                values.append("\\N")
-            elif isinstance(val, bool):
-                values.append("t" if val else "f")
-            else:
-                values.append(
-                    str(val).replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n")
-                )
-        csv_buffer.write("\t".join(values) + "\n")
+    # Convert booleans to PostgreSQL format ('t'/'f')
+    for col in df.columns:
+        if df[col].dtype == pl.Boolean:
+            df = df.with_columns(
+                pl.when(pl.col(col) == True)
+                .then(pl.lit("t"))
+                .when(pl.col(col) == False)
+                .then(pl.lit("f"))
+                .otherwise(pl.lit(None))
+                .alias(col)
+            )
 
-    csv_buffer.seek(0)
+    # Use Polars native CSV writer (Rust - much faster than Python iteration)
+    csv_buffer = io.BytesIO()
+    df.write_csv(csv_buffer, separator="\t", null_value="\\N")
+    csv_data = csv_buffer.getvalue().decode("utf-8")
 
     with conn.cursor() as cur:
         with cur.copy(
             f"COPY fills ({','.join(DB_COLUMNS)}) FROM STDIN WITH (FORMAT text, HEADER true)"
         ) as copy:
-            while data := csv_buffer.read(8192):
-                copy.write(data)
+            copy.write(csv_data)
 
     return len(df)
 
