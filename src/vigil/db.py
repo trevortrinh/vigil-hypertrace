@@ -92,7 +92,13 @@ def load_dataframe_to_db(df: pl.DataFrame, conn) -> int:
     # Convert liquidation struct to JSON string (handle null dtype too)
     liq_dtype = df["liquidation"].dtype
     if liq_dtype != pl.String and liq_dtype != pl.Null:
-        df = df.with_columns(pl.col("liquidation").struct.json_encode().alias("liquidation"))
+        # Encode struct to JSON, then replace "null" string with actual NULL
+        df = df.with_columns(
+            pl.when(pl.col("liquidation").is_null())
+            .then(pl.lit(None))
+            .otherwise(pl.col("liquidation").struct.json_encode())
+            .alias("liquidation")
+        )
     elif liq_dtype == pl.Null:
         df = df.with_columns(pl.lit(None).cast(pl.String).alias("liquidation"))
 
