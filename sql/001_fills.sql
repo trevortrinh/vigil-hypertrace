@@ -29,12 +29,13 @@ CREATE TABLE IF NOT EXISTS fills (
     cloid           TEXT,                        -- Client order ID
     builder         TEXT,                        -- Builder/frontend address
     liquidation     TEXT                         -- Liquidation info
-);
-
--- Convert to hypertable partitioned by time (ms)
-SELECT create_hypertable('fills', 'time',
-    chunk_time_interval => 86400000,  -- 1 day in milliseconds
-    if_not_exists => TRUE
+) WITH (
+    tsdb.hypertable,
+    tsdb.partition_column = 'time',
+    tsdb.chunk_interval = 86400000,              -- 1 day in milliseconds
+    tsdb.columnstore,
+    tsdb.segmentby = 'user_address',             -- Most common filter column
+    tsdb.orderby = 'time DESC'
 );
 
 -- =============================================================================
@@ -47,3 +48,9 @@ CREATE INDEX IF NOT EXISTS idx_fills_tid ON fills (tid);
 CREATE INDEX IF NOT EXISTS idx_fills_twap_id ON fills (twap_id) WHERE twap_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_fills_builder ON fills (builder) WHERE builder IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_fills_liquidation ON fills (liquidation) WHERE liquidation IS NOT NULL;
+
+-- =============================================================================
+-- COMPRESSION POLICY
+-- =============================================================================
+-- Automatically compress chunks older than 1 day (data is append-only)
+CALL add_columnstore_policy('fills', after => INTERVAL '1 day');
