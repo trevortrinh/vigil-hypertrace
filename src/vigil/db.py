@@ -89,21 +89,22 @@ def load_dataframe_to_db(df: pl.DataFrame, conn) -> int:
     # Select and rename to DB columns
     df = df.select(PARQUET_COLUMNS).rename(PARQUET_TO_DB)
 
-    # Convert liquidation struct to JSON string (only nested column)
-    if "liquidation" in df.columns and df["liquidation"].dtype != pl.String:
+    # Convert liquidation struct to JSON string (handle null dtype too)
+    liq_dtype = df["liquidation"].dtype
+    if liq_dtype != pl.String and liq_dtype != pl.Null:
         df = df.with_columns(pl.col("liquidation").struct.json_encode().alias("liquidation"))
+    elif liq_dtype == pl.Null:
+        df = df.with_columns(pl.lit(None).cast(pl.String).alias("liquidation"))
 
-    # Convert booleans to PostgreSQL format ('t'/'f')
-    for col in df.columns:
-        if df[col].dtype == pl.Boolean:
-            df = df.with_columns(
-                pl.when(pl.col(col) == True)
-                .then(pl.lit("t"))
-                .when(pl.col(col) == False)
-                .then(pl.lit("f"))
-                .otherwise(pl.lit(None))
-                .alias(col)
-            )
+    # Convert crossed boolean to PostgreSQL format ('t'/'f') - single operation
+    df = df.with_columns(
+        pl.when(pl.col("crossed") == True)
+        .then(pl.lit("t"))
+        .when(pl.col("crossed") == False)
+        .then(pl.lit("f"))
+        .otherwise(pl.lit(None))
+        .alias("crossed")
+    )
 
     # Use Polars native CSV writer (Rust - much faster than Python iteration)
     csv_buffer = io.BytesIO()
