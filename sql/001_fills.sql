@@ -39,17 +39,6 @@ CREATE TABLE IF NOT EXISTS fills (
 );
 
 -- =============================================================================
--- INDEXES
--- =============================================================================
-
-CREATE INDEX IF NOT EXISTS idx_fills_user_time ON fills (user_address, time DESC);
-CREATE INDEX IF NOT EXISTS idx_fills_coin_time ON fills (coin, time DESC);
-CREATE INDEX IF NOT EXISTS idx_fills_tid ON fills (tid);
-CREATE INDEX IF NOT EXISTS idx_fills_twap_id ON fills (twap_id) WHERE twap_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_fills_builder ON fills (builder) WHERE builder IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_fills_liquidation ON fills (liquidation) WHERE liquidation IS NOT NULL;
-
--- =============================================================================
 -- COMPRESSION POLICY
 -- =============================================================================
 -- Automatically compress chunks older than 1 day (data is append-only)

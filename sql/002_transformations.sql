@@ -1,5 +1,16 @@
--- -- Vigil: Derived tables and views
--- -- Run after data is imported into fills table
+-- Vigil: Post-load indexes and derived tables
+-- Run after bulk data import is complete
+
+-- =============================================================================
+-- INDEXES (run after bulk load for faster import)
+-- =============================================================================
+
+-- CREATE INDEX IF NOT EXISTS idx_fills_user_time ON fills (user_address, time DESC);
+-- CREATE INDEX IF NOT EXISTS idx_fills_coin_time ON fills (coin, time DESC);
+-- CREATE INDEX IF NOT EXISTS idx_fills_tid ON fills (tid);
+-- CREATE INDEX IF NOT EXISTS idx_fills_twap_id ON fills (twap_id) WHERE twap_id IS NOT NULL;
+-- CREATE INDEX IF NOT EXISTS idx_fills_builder ON fills (builder) WHERE builder IS NOT NULL;
+-- CREATE INDEX IF NOT EXISTS idx_fills_liquidation ON fills (liquidation) WHERE liquidation IS NOT NULL;
 
 -- -- =============================================================================
 -- -- VIEWS (for convenience, not continuous aggregates)
