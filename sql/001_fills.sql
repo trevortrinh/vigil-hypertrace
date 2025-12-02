@@ -42,4 +42,6 @@ CREATE TABLE IF NOT EXISTS fills (
 -- COMPRESSION POLICY
 -- =============================================================================
 -- Automatically compress chunks older than 1 day (data is append-only)
-CALL add_columnstore_policy('fills', after => INTERVAL '1 day');
+-- Time is in milliseconds, so 1 day = 86400000ms
+CALL remove_columnstore_policy('fills', if_exists => true);
+CALL add_columnstore_policy('fills', 86400000::bigint);
