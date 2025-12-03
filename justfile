@@ -6,26 +6,18 @@ data_dir := "data"
 # CLOUD DB
 # =============================================================================
 
-db-query sql:
-    #!/usr/bin/env bash
-    source .env && psql "$DATABASE_URL" -c "{{sql}}"
-
-db-shell:
-    #!/usr/bin/env bash
-    source .env && psql "$DATABASE_URL"
-
-db-migrate:
+db-base-schema:
     #!/usr/bin/env bash
     source .env
     psql "$DATABASE_URL" -f sql/001_fills.sql
     psql "$DATABASE_URL" -f sql/002_load_tracking.sql
 
-db-aggregates:
+db-aggregates-schema:
     #!/usr/bin/env bash
     source .env
     psql "$DATABASE_URL" -f sql/003_continuous_aggregates.sql
 
-db-refresh:
+db-refresh-aggregates:
     #!/usr/bin/env bash
     source .env
     psql "$DATABASE_URL" -c "CALL refresh_continuous_aggregate('trader_daily', NULL, NULL);"
@@ -36,7 +28,16 @@ db-refresh:
 # comment out to avoid resetting db
 db-reset:
   just db-query "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-  just db-migrate
+  just db-base-schema
+
+db-query sql:
+    #!/usr/bin/env bash
+    source .env && psql "$DATABASE_URL" -c "{{sql}}"
+
+db-shell:
+    #!/usr/bin/env bash
+    source .env && psql "$DATABASE_URL"
+
 
 # =============================================================================
 # DATA
