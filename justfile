@@ -23,7 +23,8 @@ db-migrate:
     done
 
 db-reset:
-    just db-query "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+    #  comment out to avoid resetting db
+    # just db-query "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
     just db-migrate
 
 db-shell:
