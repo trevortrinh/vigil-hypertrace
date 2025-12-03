@@ -60,6 +60,7 @@ def main():
         print(f"No parquet files in {SOURCE_DIR}")
         return
 
+    print(f"[CLOUD DB] Loading to TimescaleDB...")
     print(f"Source: {SOURCE_DIR} ({'S3' if is_s3_path(SOURCE_DIR) else 'local'})")
     print(f"Found {len(files)} file(s)")
 

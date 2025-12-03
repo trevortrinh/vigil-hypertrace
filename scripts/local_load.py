@@ -14,10 +14,10 @@ import sys
 from pathlib import Path
 
 import polars as pl
+import psycopg
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from vigil.db import get_db_connection
+# Local DB connection - NOT the cloud DATABASE_URL
+LOCAL_DB = "postgresql://postgres:password@localhost:5435/vigil"
 
 # DB columns in order
 DB_COLUMNS = [
@@ -58,15 +58,13 @@ def main():
         .alias("crossed")
     )
 
-    print("Connecting to database...")
-    conn = get_db_connection()
+    print(f"[LOCAL DB] Connecting to localhost:5435/vigil...")
+    conn = psycopg.connect(LOCAL_DB)
 
     try:
-        # Clear existing data
         with conn.cursor() as cur:
             cur.execute("TRUNCATE TABLE fills")
             conn.commit()
-        print("Cleared existing fills")
 
         # Write to CSV buffer
         csv_buffer = io.BytesIO()
