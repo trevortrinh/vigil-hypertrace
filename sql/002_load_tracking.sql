@@ -7,5 +7,3 @@ CREATE TABLE IF NOT EXISTS load_progress (
     loaded_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- To reset and reload everything:
--- TRUNCATE fills, load_progress;

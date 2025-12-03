@@ -145,7 +145,13 @@ def execute_query(query: str, conn=None) -> pl.DataFrame:
             cur.execute(query)
             columns = [desc[0] for desc in cur.description]
             rows = cur.fetchall()
-            return pl.DataFrame(rows, schema=columns, orient="row")
+
+            if not rows:
+                return pl.DataFrame(schema={col: pl.Utf8 for col in columns})
+
+            # Convert to list of dicts for more robust schema inference
+            data = [dict(zip(columns, row)) for row in rows]
+            return pl.DataFrame(data, infer_schema_length=None)
     finally:
         if should_close:
             conn.close()
