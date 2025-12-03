@@ -26,9 +26,9 @@ db-refresh:
     psql "$DATABASE_URL" -c "REFRESH MATERIALIZED VIEW trader_profiles;"
 
 # comment out to avoid resetting db
-db-reset:
-  just db-query "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-  just db-base
+# db-reset:
+#   just db-query "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+#   just db-base
 
 db-query sql:
     #!/usr/bin/env bash
