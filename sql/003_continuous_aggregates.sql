@@ -2,6 +2,17 @@
 -- Everything computed in SQL - no Python needed for core metrics
 
 -- =============================================================================
+-- INTEGER TIME FUNCTION (required for continuous aggregates on BIGINT time)
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION current_epoch_ms()
+RETURNS BIGINT AS $$
+    SELECT (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000)::bigint;
+$$ LANGUAGE SQL STABLE;
+
+SELECT set_integer_now_func('fills', 'current_epoch_ms');
+
+-- =============================================================================
 -- LEVEL 1: CONTINUOUS AGGREGATES (auto-refresh from fills)
 -- =============================================================================
 
