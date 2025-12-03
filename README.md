@@ -1,4 +1,4 @@
-# vigil contract
+# vigil
 
 ### setup
 
