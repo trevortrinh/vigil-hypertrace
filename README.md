@@ -53,7 +53,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 
 # 6. run in background
-nohup uv run python -u scripts/load_to_db.py > load.log 2>&1 &
+nohup uv run python -u scripts/cloud_load.py > load.log 2>&1 &
 tail -f load.log
 
 # 7. kill background process
