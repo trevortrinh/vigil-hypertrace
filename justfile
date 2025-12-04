@@ -67,6 +67,9 @@ fetch-data:
 cloud-load:
     uv run python scripts/cloud_load.py
 
+find-new-smart-money:
+    uv run python scripts/find_new_smart_money.py --all --lambda -w 10
+    
 # =============================================================================
 # UTILS
 # =============================================================================

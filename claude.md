@@ -21,8 +21,14 @@ src/vigil/           # Core library
   db.py              # Database connection and COPY loading
 
 scripts/             # CLI entry points
-  fetch_data.py      # Download fills from Hyperliquid S3 → Parquet
-  cloud_load.py      # Load Parquet files → TimescaleDB (parallel)
+  fetch_data.py           # Download fills from Hyperliquid S3 → Parquet
+  cloud_load.py           # Load Parquet files → TimescaleDB (parallel)
+  find_new_smart_money.py # Find traders who started after a cutoff date
+  deploy_lambda.py        # Deploy HTTP proxy Lambda for IP rotation
+
+lambda/              # AWS Lambda functions
+  http_proxy/
+    handler.py       # HTTP proxy for IP rotation on rate-limited APIs
 
 sql/                 # Database schema (run in order)
   001_fills.sql           # Fills hypertable (partitioned by time)
@@ -139,6 +145,68 @@ uv sync
 nohup uv run python -u scripts/cloud_load.py > load.log 2>&1 &
 tail -f load.log
 ```
+
+## Lambda IP Rotation
+
+For querying the Hyperliquid API at scale (thousands of traders), rate limits become a bottleneck. The Lambda proxy provides IP rotation by leveraging AWS Lambda's ephemeral execution environment.
+
+### How It Works
+
+```
+find_new_smart_money.py
+    ↓ boto3.invoke()
+vigil-http-proxy Lambda (us-east-1)
+    ↓ urllib.request
+Hyperliquid API
+```
+
+Each Lambda invocation gets a different IP from AWS's pool, effectively bypassing per-IP rate limits.
+
+### Deployment
+
+```bash
+# Deploy Lambda function + IAM role
+python scripts/deploy_lambda.py
+
+# Test deployment
+python scripts/deploy_lambda.py --test
+
+# Delete Lambda + role
+python scripts/deploy_lambda.py --delete
+```
+
+### Find New Smart Money
+
+Identifies traders from `smart_money_watchlist` who started trading after a cutoff date (default: Aug 1, 2025). Useful for finding fresh alpha - traders who achieved smart money status quickly.
+
+```bash
+# Basic usage (top 50 traders, direct requests)
+uv run python scripts/find_new_smart_money.py
+
+# Check all smart money traders
+uv run python scripts/find_new_smart_money.py --all
+
+# Use Lambda for IP rotation (faster, no rate limits)
+uv run python scripts/find_new_smart_money.py --all --lambda
+
+# Lambda with 10 concurrent workers
+uv run python scripts/find_new_smart_money.py --all --lambda -w 10
+
+# Custom cutoff date
+uv run python scripts/find_new_smart_money.py --cutoff 2025-10-01
+```
+
+Output is streamed to JSONL (`data/new_smart_money_YYYYMMDD.jsonl`):
+```json
+{"user_address": "0x...", "is_new": true, "first_fill": "2025-09-15", "last_fill": "2025-12-01", "api_closed_pnl": 150000.00, "db_net_pnl": 148500.00, "sharpe_ratio": 2.15, ...}
+```
+
+### Lambda Metadata Logging
+
+When using `--lambda`, request metadata is logged to `data/lambda_YYYYMMDD_HHMMSS.jsonl`:
+- Request timing and duration
+- Lambda internal IP (for debugging IP rotation)
+- Unique IPs used across all requests
 
 ## Current Focus
 
