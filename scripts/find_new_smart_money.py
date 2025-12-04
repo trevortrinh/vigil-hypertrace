@@ -65,7 +65,7 @@ class LambdaClient:
         self.workers = workers
 
     def post(self, payload: dict) -> dict:
-        for attempt in range(3):
+        for attempt in range(6):
             resp = self.client.invoke(
                 FunctionName=LAMBDA_FUNCTION,
                 InvocationType="RequestResponse",
@@ -73,12 +73,14 @@ class LambdaClient:
             )
             result = json.loads(resp["Payload"].read())
             if result.get("statusCode") == 429:
-                time.sleep(2 ** (attempt + 1))
+                wait = min(2 ** (attempt + 1), 30)
+                print(f" [429, wait {wait}s]", end="", flush=True)
+                time.sleep(wait)
                 continue
             if result.get("statusCode") != 200:
                 raise Exception(result.get("error", "Unknown error"))
             return json.loads(result["body"])
-        raise Exception("Rate limited")
+        raise Exception("Rate limited after 6 retries")
 
     def post_many(self, payloads: list[dict]) -> list:
         """Parallel requests."""
@@ -95,70 +97,20 @@ class LambdaClient:
 
 
 # -----------------------------------------------------------------------------
-# API Helpers
+# Helpers
 # -----------------------------------------------------------------------------
 
-def make_fills_payload(address: str, reversed: bool = False, start_time: int = 0) -> dict:
-    """Build userFillsByTime payload."""
+def make_fills_payload(address: str) -> dict:
+    """Build userFillsByTime payload - oldest first, just need 1 fill."""
     return {
         "type": "userFillsByTime",
         "user": address,
-        "startTime": start_time,
+        "startTime": 0,
         "endTime": int(1e15),
         "aggregateByTime": False,
-        "reversed": reversed,
+        "reversed": False,  # Oldest first
     }
 
-
-def get_trader_data_sequential(client, address: str, cutoff_ms: int, use_sleep: bool = True):
-    """
-    Get trader fill data with sequential API calls.
-    For DirectClient (with rate limiting).
-
-    Returns (is_new, first_fill, last_fill, api_pnl).
-    """
-    # Get oldest fills first (reversed=False)
-    first_page = client.post(make_fills_payload(address, reversed=False))
-
-    if not first_page:
-        return False, None, None, None
-
-    first_time = int(first_page[0]["time"])
-    first_fill = datetime.fromtimestamp(first_time / 1000)
-    is_new = first_time >= cutoff_ms
-
-    if not is_new:
-        # OLD trader - just get last fill
-        last_page = client.post(make_fills_payload(address, reversed=True))
-        last_fill = datetime.fromtimestamp(int(last_page[0]["time"]) / 1000)
-        return False, first_fill, last_fill, None
-
-    # NEW trader - get all fills for api_pnl
-    all_fills = list(first_page)
-
-    if len(first_page) == 2000:
-        # Paginate forward
-        start_time = max(int(f["time"]) for f in first_page) + 1
-        while True:
-            page = client.post(make_fills_payload(address, reversed=False, start_time=start_time))
-            if not page:
-                break
-            all_fills.extend(page)
-            if len(page) < 2000:
-                break
-            start_time = max(int(f["time"]) for f in page) + 1
-            if use_sleep:
-                time.sleep(0.3)
-
-    last_fill = datetime.fromtimestamp(max(int(f["time"]) for f in all_fills) / 1000)
-    api_pnl = sum(float(f.get("closedPnl", 0)) for f in all_fills)
-
-    return True, first_fill, last_fill, api_pnl
-
-
-# -----------------------------------------------------------------------------
-# Main Processing
-# -----------------------------------------------------------------------------
 
 def get_traders(limit: int | None) -> list[dict]:
     """Fetch traders from DB ordered by Sharpe."""
@@ -175,21 +127,25 @@ def get_traders(limit: int | None) -> list[dict]:
         return [dict(zip(cols, row)) for row in cur.fetchall()]
 
 
-def make_record(trader: dict, is_new: bool, first, last, pnl) -> dict:
-    """Build output record from trader data."""
-    return {
+def make_record(trader: dict, is_new: bool, error=None) -> dict:
+    """Build output record."""
+    rec = {
         "address": trader["user_address"],
+        "is_new": is_new,
         "db_pnl": round(float(trader["net_pnl"]), 2),
         "sharpe": round(float(trader["sharpe_ratio"]), 2),
         "win_rate": round(float(trader["win_rate"]), 4),
         "volume": round(float(trader["total_volume"]), 2),
         "days": int(trader["trading_days"]),
-        "is_new": is_new,
-        "first_fill": str(first.date()) if first else None,
-        "last_fill": str(last.date()) if last else None,
-        "api_pnl": round(pnl, 2) if pnl else None,
     }
+    if error:
+        rec["error"] = str(error)
+    return rec
 
+
+# -----------------------------------------------------------------------------
+# Processing
+# -----------------------------------------------------------------------------
 
 def process_sequential(client, traders: list[dict], cutoff_ms: int, output_file) -> int:
     """Process traders sequentially (for DirectClient)."""
@@ -200,119 +156,28 @@ def process_sequential(client, traders: list[dict], cutoff_ms: int, output_file)
         print(f"[{i}/{len(traders)}] {addr[:10]}...", end=" ", flush=True)
 
         try:
-            is_new, first, last, pnl = get_trader_data_sequential(client, addr, cutoff_ms, use_sleep=True)
+            page = client.post(make_fills_payload(addr))
 
-            if not first:
+            if not page:
                 print("no fills")
-                record = make_record(trader, False, None, None, None)
-            elif is_new:
-                print(f"NEW {first.date()} -> {last.date()} ${pnl:,.0f}")
-                record = make_record(trader, True, first, last, pnl)
-                new_count += 1
+                record = make_record(trader, False)
             else:
-                print(f"old ({first.date()} -> {last.date()})")
-                record = make_record(trader, False, first, last, None)
+                first_time = int(page[0]["time"])
+                is_new = first_time >= cutoff_ms
+                print("NEW" if is_new else "old")
+                record = make_record(trader, is_new)
+                if is_new:
+                    new_count += 1
 
         except Exception as e:
             print(f"error: {e}")
-            record = {**make_record(trader, False, None, None, None), "error": str(e)}
+            record = make_record(trader, False, error=e)
 
         output_file.write(json.dumps(record) + "\n")
         output_file.flush()
-        time.sleep(0.3)  # Rate limit for direct client
+        time.sleep(0.3)
 
     return new_count
-
-
-def process_batch_lambda(client: "LambdaClient", traders: list[dict], cutoff_ms: int, batch_start: int, total: int) -> list[dict]:
-    """
-    Process a batch of traders with parallel Lambda calls.
-    Returns list of record dicts.
-    """
-    # Step 1: Parallel first-page queries (reversed=False to get oldest first)
-    payloads = [make_fills_payload(t["user_address"], reversed=False) for t in traders]
-    first_pages = client.post_many(payloads)
-
-    results = []
-    old_traders_needing_last = []  # (trader, first_fill, idx_in_batch)
-    new_traders_needing_pagination = []  # (trader, first_page, first_fill, idx_in_batch)
-
-    # Step 2: Categorize results
-    for i, (trader, page) in enumerate(zip(traders, first_pages)):
-        idx = batch_start + i + 1
-        addr = trader["user_address"]
-
-        if isinstance(page, Exception):
-            print(f"[{idx}/{total}] {addr[:10]}... error: {page}")
-            results.append({**make_record(trader, False, None, None, None), "error": str(page)})
-            continue
-
-        if not page:
-            print(f"[{idx}/{total}] {addr[:10]}... no fills")
-            results.append(make_record(trader, False, None, None, None))
-            continue
-
-        first_time = int(page[0]["time"])
-        first_fill = datetime.fromtimestamp(first_time / 1000)
-        is_new = first_time >= cutoff_ms
-
-        if not is_new:
-            # OLD trader - need to get last fill
-            old_traders_needing_last.append((trader, first_fill, len(results)))
-            results.append(None)  # Placeholder
-        else:
-            # NEW trader - may need pagination for PnL
-            if len(page) < 2000:
-                # All fills in one page
-                last_fill = datetime.fromtimestamp(int(page[-1]["time"]) / 1000)
-                api_pnl = sum(float(f.get("closedPnl", 0)) for f in page)
-                print(f"[{idx}/{total}] {addr[:10]}... NEW {first_fill.date()} -> {last_fill.date()} ${api_pnl:,.0f}")
-                results.append(make_record(trader, True, first_fill, last_fill, api_pnl))
-            else:
-                # Need pagination
-                new_traders_needing_pagination.append((trader, page, first_fill, len(results)))
-                results.append(None)  # Placeholder
-
-    # Step 3: Batch get last fills for OLD traders
-    if old_traders_needing_last:
-        last_payloads = [make_fills_payload(t["user_address"], reversed=True) for t, _, _ in old_traders_needing_last]
-        last_pages = client.post_many(last_payloads)
-
-        for (trader, first_fill, result_idx), last_page in zip(old_traders_needing_last, last_pages):
-            idx = batch_start + result_idx + 1
-            addr = trader["user_address"]
-
-            if isinstance(last_page, Exception):
-                print(f"[{idx}/{total}] {addr[:10]}... error getting last: {last_page}")
-                results[result_idx] = {**make_record(trader, False, first_fill, None, None), "error": str(last_page)}
-            else:
-                last_fill = datetime.fromtimestamp(int(last_page[0]["time"]) / 1000)
-                print(f"[{idx}/{total}] {addr[:10]}... old ({first_fill.date()} -> {last_fill.date()})")
-                results[result_idx] = make_record(trader, False, first_fill, last_fill, None)
-
-    # Step 4: Handle NEW traders needing pagination (sequential per trader, but no sleeps)
-    for trader, first_page, first_fill, result_idx in new_traders_needing_pagination:
-        idx = batch_start + result_idx + 1
-        addr = trader["user_address"]
-
-        all_fills = list(first_page)
-        start_time = max(int(f["time"]) for f in first_page) + 1
-
-        while True:
-            page = client.post(make_fills_payload(addr, reversed=False, start_time=start_time))
-            if not page:
-                break
-            all_fills.extend(page)
-            if len(page) < 2000:
-                break
-            start_time = max(int(f["time"]) for f in page) + 1
-
-        last_fill = datetime.fromtimestamp(max(int(f["time"]) for f in all_fills) / 1000)
-        api_pnl = sum(float(f.get("closedPnl", 0)) for f in all_fills)
-        print(f"[{idx}/{total}] {addr[:10]}... NEW {first_fill.date()} -> {last_fill.date()} ${api_pnl:,.0f} ({len(all_fills)} fills)")
-        results[result_idx] = make_record(trader, True, first_fill, last_fill, api_pnl)
-
-    return results
 
 
 def process_lambda(client: "LambdaClient", traders: list[dict], cutoff_ms: int, output_file) -> int:
@@ -322,13 +187,31 @@ def process_lambda(client: "LambdaClient", traders: list[dict], cutoff_ms: int, 
 
     for i in range(0, len(traders), batch_size):
         batch = traders[i:i + batch_size]
-        records = process_batch_lambda(client, batch, cutoff_ms, i, len(traders))
 
-        for record in records:
+        # Parallel first-page queries - 1 API call per trader!
+        payloads = [make_fills_payload(t["user_address"]) for t in batch]
+        pages = client.post_many(payloads)
+
+        for j, (trader, page) in enumerate(zip(batch, pages)):
+            idx = i + j + 1
+            addr = trader["user_address"]
+
+            if isinstance(page, Exception):
+                print(f"[{idx}/{len(traders)}] {addr[:10]}... error: {page}")
+                record = make_record(trader, False, error=page)
+            elif not page:
+                print(f"[{idx}/{len(traders)}] {addr[:10]}... no fills")
+                record = make_record(trader, False)
+            else:
+                first_time = int(page[0]["time"])
+                is_new = first_time >= cutoff_ms
+                print(f"[{idx}/{len(traders)}] {addr[:10]}... {'NEW' if is_new else 'old'}")
+                record = make_record(trader, is_new)
+                if is_new:
+                    new_count += 1
+
             output_file.write(json.dumps(record) + "\n")
             output_file.flush()
-            if record.get("is_new"):
-                new_count += 1
 
     return new_count
 
