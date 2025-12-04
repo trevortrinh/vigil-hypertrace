@@ -59,3 +59,28 @@ tail -f load.log
 # 7. kill background process
 pkill -9 -f python
 ```
+
+in this dataset
+
+| First Fill              | Last Fill               |
+| ----------------------- | ----------------------- |
+| 2025-07-27 08:50:10 UTC | 2025-12-01 12:59:59 UTC |
+| 64 days of data         |                         |
+
+Top 20 new traders by lowest volume (highest capital efficiency):
+
+| Address             | PnL   | Volume | Days | Sharpe |
+| ------------------- | ----- | ------ | ---- | ------ |
+| 0x26393bcb4446d3... | $112K | $1.2M  | 31   | 5.76   |
+| 0x870ce4cbe75814... | $244K | $1.5M  | 19   | 6.33   |
+| 0x6581c99e278c12... | $141K | $1.5M  | 18   | 3.94   |
+| 0x98d0e60828e17d... | $160K | $1.9M  | 36   | 3.11   |
+| 0x0980b34ade9476... | $143K | $1.9M  | 20   | 4.44   |
+| 0xdec8eb506264ab... | $103K | $2.3M  | 17   | 11.56  |
+| 0xf831a8c0788a44... | $201K | $2.5M  | 65   | 9.98   |
+| 0xff35440e44c9db... | $199K | $2.6M  | 19   | 6.03   |
+| 0x4a13807147b2a3... | $362K | $3.1M  | 21   | 4.21   |
+| 0xced9bd642f2981... | $169K | $3.4M  | 29   | 13.12  |
+
+want to follow wallets like:
+0x26393bcb4446d3f40bdc15ca59d7febcb09e7236
