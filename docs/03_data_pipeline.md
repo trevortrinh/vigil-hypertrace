@@ -5,7 +5,7 @@ Pure SQL analytics - everything computed in TimescaleDB.
 ## Architecture
 
 ```
-fills (hypertable, 1.9B rows)
+fills (hypertable, 960M rows)
     │
     │ continuous aggregate (auto-refresh hourly)
     ▼

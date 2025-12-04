@@ -17,13 +17,29 @@ db-aggregates:
     source .env
     psql "$DATABASE_URL" -f sql/003_continuous_aggregates.sql
 
+db-fix:
+    #!/usr/bin/env bash
+    source .env
+    psql "$DATABASE_URL" -f sql/004_fix_stuff.sql
+
 db-refresh:
     #!/usr/bin/env bash
     source .env
+    # Incremental refresh - last 7 days of continuous aggregates + all materialized views
+    psql "$DATABASE_URL" -c "CALL refresh_continuous_aggregate('trader_daily', (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint - 604800000, NULL);"
+    psql "$DATABASE_URL" -c "CALL refresh_continuous_aggregate('coin_daily', (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint - 604800000, NULL);"
+    psql "$DATABASE_URL" -c "CALL refresh_continuous_aggregate('builder_daily', (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint - 604800000, NULL);"
+    psql "$DATABASE_URL" -c "SELECT refresh_all_stats();"
+
+db-refresh-full:
+    #!/usr/bin/env bash
+    source .env
+    # Full refresh - use after bulk data loads
     psql "$DATABASE_URL" -c "CALL refresh_continuous_aggregate('trader_daily', NULL, NULL);"
     psql "$DATABASE_URL" -c "CALL refresh_continuous_aggregate('coin_daily', NULL, NULL);"
     psql "$DATABASE_URL" -c "CALL refresh_continuous_aggregate('builder_daily', NULL, NULL);"
-    psql "$DATABASE_URL" -c "REFRESH MATERIALIZED VIEW trader_profiles;"
+    psql "$DATABASE_URL" -c "SELECT refresh_all_stats();"
+
 
 # comment out to avoid resetting db
 # db-reset:
