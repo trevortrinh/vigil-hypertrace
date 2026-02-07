@@ -1,4 +1,6 @@
-# vigil
+# vigil-hypertrace
+
+[Notion](https://www.notion.so/onedollarsummer/Vigil-Hypertrace-300eaf5f4629800b8199d1a9e22cb0a3)
 
 ### setup
 
